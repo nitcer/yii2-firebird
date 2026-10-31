@@ -1,0 +1,80 @@
+warning: in the working copy of 'src/Connection.php', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/ColumnSchema.php b/src/ColumnSchema.php[m
+[1mindex eeea7c4..9098e72 100644[m
+[1m--- a/src/ColumnSchema.php[m
+[1m+++ b/src/ColumnSchema.php[m
+[36m@@ -75,9 +75,9 @@[m [mclass ColumnSchema extends \yii\db\ColumnSchema[m
+                 }[m
+                 return (int) $value;[m
+             case 'boolean':[m
+[31m-                return (boolean) $value;[m
+[32m+[m[32m                return (bool) $value;[m
+             case 'double':[m
+[31m-                return (double) $value;[m
+[32m+[m[32m                return (float) $value;[m
+         }[m
+ [m
+         return $value;[m
+[1mdiff --git a/src/Connection.php b/src/Connection.php[m
+[1mindex b77830a..5e7d968 100644[m
+[1m--- a/src/Connection.php[m
+[1m+++ b/src/Connection.php[m
+[36m@@ -102,29 +102,42 @@[m [mclass Connection extends \yii\db\Connection[m
+     public function init()[m
+     {[m
+         parent::init();[m
+[31m-        [m
+[31m-        if ($this->firebird_version) {[m
+[31m-            return;[m
+[31m-        }[m
+[31m-[m
+[31m-        try {[m
+[31m-            $pdo = $this->createPdoInstance();[m
+ [m
+[31m-            $server_version = $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION);[m
+[31m-[m
+[31m-            if (preg_match('/\w{2}-[TV](\d+\.\d+\.\d+).*remote server/', $server_version, $matches)) {[m
+[31m-                $this->firebird_version = $matches[1];[m
+[32m+[m[32m        if (!$this->firebird_version) {[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                // Use a temporary PDO instance to avoid recursive Connection::open() calls.[m
+[32m+[m[32m                $pdo = $this->createPdoInstance();[m
+[32m+[m[32m                try {[m
+[32m+[m[32m                    $version = $pdo->query("SELECT RDB\$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') FROM RDB\$DATABASE")->fetchColumn();[m
+[32m+[m[32m                } catch (\PDOException $ex) {[m
+[32m+[m[32m                    $version = null;[m
+[32m+[m[32m                }[m
+[32m+[m[32m                if (is_string($version) && preg_match('/^(\d+\.\d+(?:\.\d+)?)/', $version, $matches)) {[m
+[32m+[m[32m                    $this->firebird_version = $matches[1];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                if (!$this->firebird_version) {[m
+[32m+[m[32m                    $serverVersion = (string) $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION);[m
+[32m+[m[32m                    if (preg_match('/(\d+\.\d+\.\d+)/', $serverVersion, $matches)) {[m
+[32m+[m[32m                        $this->firebird_version = $matches[1];[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                }[m
+[32m+[m[32m            } catch (\Throwable $ex) {[m
+[32m+[m[32m                throw new \yii\db\Exception('Unable to determine Firebird server version: ' . $ex->getMessage(), [], $ex);[m
+             }[m
+[31m-        } catch (\Exception $ex) {[m
+         }[m
+[31m-        [m
+[32m+[m
+[32m+[m[32m        if (!$this->firebird_version) {[m
+[32m+[m[32m            throw new \yii\db\Exception('Unable to determine Firebird server version. Set firebird_version explicitly if necessary.');[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        $pdoVersion = phpversion('pdo_firebird') ?: PHP_VERSION;[m
+         $supports = [[m
+             'supportColumnIdentity' => version_compare($this->firebird_version, '3.0.0', '>='),[m
+             'supportStableCursor' => version_compare($this->firebird_version, '3.0.0', '>='),[m
+[31m-            'supportReturningInsert' => version_compare($this->firebird_version, '3.0.0', '<') || version_compare(phpversion('pdo_firebird'), '7.0.15', '>='),[m
+[31m-            'supportBlobDataType' => version_compare(phpversion('pdo_firebird'), '7.0.13', '>'),[m
+[32m+[m[32m            'supportReturningInsert' => version_compare($this->firebird_version, '3.0.0', '<') || version_compare($pdoVersion, '7.0.15', '>='),[m
+[32m+[m[32m            'supportBlobDataType' => version_compare($pdoVersion, '7.0.13', '>'),[m
+         ];[m
+[31m-        [m
+[32m+[m
+         foreach ($supports as $key => $value) {[m
+             if ($this->{$key} === null) {[m
+                 $this->{$key} = $value;[m
