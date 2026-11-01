@@ -102,29 +102,42 @@ class Connection extends \yii\db\Connection
     public function init()
     {
         parent::init();
-        
-        if ($this->firebird_version) {
-            return;
-        }
 
-        try {
-            $pdo = $this->createPdoInstance();
-
-            $server_version = $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION);
-
-            if (preg_match('/\w{2}-[TV](\d+\.\d+\.\d+).*remote server/', $server_version, $matches)) {
-                $this->firebird_version = $matches[1];
+        if (!$this->firebird_version) {
+            try {
+                // Use a temporary PDO instance to avoid recursive Connection::open() calls.
+                $pdo = $this->createPdoInstance();
+                try {
+                    $version = $pdo->query("SELECT RDB\$GET_CONTEXT('SYSTEM', 'ENGINE_VERSION') FROM RDB\$DATABASE")->fetchColumn();
+                } catch (\PDOException $ex) {
+                    $version = null;
+                }
+                if (is_string($version) && preg_match('/^(\d+\.\d+(?:\.\d+)?)/', $version, $matches)) {
+                    $this->firebird_version = $matches[1];
+                }
+                if (!$this->firebird_version) {
+                    $serverVersion = (string) $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION);
+                    if (preg_match('/(\d+\.\d+\.\d+)/', $serverVersion, $matches)) {
+                        $this->firebird_version = $matches[1];
+                    }
+                }
+            } catch (\Throwable $ex) {
+                throw new \yii\db\Exception('Unable to determine Firebird server version: ' . $ex->getMessage(), [], $ex);
             }
-        } catch (\Exception $ex) {
         }
-        
+
+        if (!$this->firebird_version) {
+            throw new \yii\db\Exception('Unable to determine Firebird server version. Set firebird_version explicitly if necessary.');
+        }
+
+        $pdoVersion = phpversion('pdo_firebird') ?: PHP_VERSION;
         $supports = [
             'supportColumnIdentity' => version_compare($this->firebird_version, '3.0.0', '>='),
             'supportStableCursor' => version_compare($this->firebird_version, '3.0.0', '>='),
-            'supportReturningInsert' => version_compare($this->firebird_version, '3.0.0', '<') || version_compare(phpversion('pdo_firebird'), '7.0.15', '>='),
-            'supportBlobDataType' => version_compare(phpversion('pdo_firebird'), '7.0.13', '>'),
+            'supportReturningInsert' => version_compare($this->firebird_version, '3.0.0', '<') || version_compare($pdoVersion, '7.0.15', '>='),
+            'supportBlobDataType' => version_compare($pdoVersion, '7.0.13', '>'),
         ];
-        
+
         foreach ($supports as $key => $value) {
             if ($this->{$key} === null) {
                 $this->{$key} = $value;

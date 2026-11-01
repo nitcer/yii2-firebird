@@ -8,7 +8,7 @@
 
 namespace edgardmessias\db\firebird;
 
-use PDO;
+use \PDO;
 
 /**
  * Description of PdoAdapter
@@ -17,9 +17,6 @@ use PDO;
  */
 class PdoAdapter extends PDO
 {
-
-    private $_inTransaction = false;
-
     /**
      * Do some basic setup for Firebird.
      * o Force use of exceptions on error.
@@ -31,6 +28,7 @@ class PdoAdapter extends PDO
      * Finally call parent constructor.
      *
      */
+
     public function __construct($dsn, $username, $password, $driver_options = [])
     {
         // Windows OS paths with backslashes should be changed
@@ -44,72 +42,32 @@ class PdoAdapter extends PDO
         parent::__construct($dsn, $username, $password, $driver_options);
     }
 
-    /**
-     * Initiates a transaction
-     * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
-     */
-    public function beginTransaction($isolationLevel = null)
+    public function beginTransaction($isolationLevel = null): bool
     {
-        $this->setAttribute(PDO::ATTR_AUTOCOMMIT, false);
+        $level = match ($isolationLevel ?? \yii\db\Transaction::READ_COMMITTED) {
+            \yii\db\Transaction::READ_COMMITTED => \Pdo\Firebird::READ_COMMITTED,
+            \yii\db\Transaction::READ_UNCOMMITTED => \Pdo\Firebird::READ_COMMITTED,
+            \yii\db\Transaction::REPEATABLE_READ => \Pdo\Firebird::REPEATABLE_READ,
+            \yii\db\Transaction::SERIALIZABLE => \Pdo\Firebird::SERIALIZABLE,
+            default => throw new \InvalidArgumentException("Unsupported isolation level: $isolationLevel"),
+        };
 
-        if ($isolationLevel === false) {
-            $this->_inTransaction = true;
-            return true;
-        }
-
-        if ($isolationLevel === null) {
-            $r = $this->exec('SET TRANSACTION');
-            $success = ($r !== false);
-            if ($success) {
-                $this->_inTransaction = true;
-            }
-            return ($success);
-        }
-
-        $r = $this->exec("SET TRANSACTION ISOLATION LEVEL $isolationLevel");
-        $success = ($r !== false);
-        if ($success) {
-            $this->_inTransaction = true;
-        }
-        return ($success);
+        $this->setAttribute(\Pdo\Firebird::TRANSACTION_ISOLATION_LEVEL, $level);
+        return parent::beginTransaction();
     }
 
-    /**
-     * Commits a transaction
-     * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
-     */
-    public function commit()
+    public function commit(): bool
     {
-        $r = $this->exec('COMMIT');
-        $this->setAttribute(PDO::ATTR_AUTOCOMMIT, true);
-        $success = ($r !== false);
-        if ($success) {
-            $this->_inTransaction = false;
-        }
-        return ($success);
+        return parent::commit();
     }
 
-    /**
-     * Rolls back a transaction
-     * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
-     */
-    public function rollBack()
+    public function rollBack(): bool
     {
-        $r = $this->exec('ROLLBACK');
-        $this->setAttribute(PDO::ATTR_AUTOCOMMIT, true);
-        $success = ($r !== false);
-        if ($success) {
-            $this->_inTransaction = false;
-        }
-        return ($success);
+        return parent::rollBack();
     }
 
-    /**
-     * Checks if inside a transaction
-     * @return bool <b>TRUE</b> if a transaction is currently active, and <b>FALSE</b> if not.
-     */
-    public function inTransaction()
+    public function inTransaction(): bool
     {
-        return $this->_inTransaction;
+        return parent::inTransaction();
     }
 }

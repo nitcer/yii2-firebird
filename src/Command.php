@@ -47,6 +47,11 @@ class Command extends \yii\db\Command
      */
     public function setSql($sql)
     {
+
+        if ($sql === null) {
+            return parent::setSql($sql);
+        }
+
         $matches = null;
         if (preg_match("/^\s*DROP TABLE IF EXISTS (['\"]?([^\s\;]+)['\"]?);?\s*$/i", $sql, $matches)) {
             if ($this->db->getSchema()->getTableSchema($matches[2]) !== null) {

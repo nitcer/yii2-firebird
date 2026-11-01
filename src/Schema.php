@@ -427,7 +427,7 @@ class Schema extends BaseSchema implements ConstraintFinderInterface
         $pkeys = array_map('rtrim', $pkeys);
         $pkeys = array_map('strtolower', $pkeys);
         foreach ($columns as $key => $column) {
-            $column = array_map('strtolower', $column);
+            $column = array_map(static fn($value) => $value === null ? null : strtolower((string)$value), $column);
             $columns[$key]['fprimary'] = in_array(rtrim($column['fname']), $pkeys);
         }
         foreach ($columns as $column) {
@@ -472,7 +472,7 @@ class Schema extends BaseSchema implements ConstraintFinderInterface
         $c->name = strtolower(rtrim($column['fname']));
         $c->allowNull = (int) $column['fnull'] !== 1;
         $c->isPrimaryKey = $column['fprimary'];
-        $c->autoIncrement = (isset($column['fgenerator_name']) && $column['fgenerator_name']) || (boolean) $column['fautoinc'];
+        $c->autoIncrement = (isset($column['fgenerator_name']) && $column['fgenerator_name']) || (bool) $column['fautoinc'];
         $c->comment = $column['fcomment'] === null ? '' : $column['fcomment'];
 
         $c->type = self::TYPE_STRING;

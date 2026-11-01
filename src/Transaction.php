@@ -89,12 +89,7 @@ class Transaction extends \yii\db\Transaction
             Yii::trace('Begin transaction' . ($isolationLevel ? ' with isolation level ' . $isolationLevel : ''), __METHOD__);
 
             $this->db->trigger(Connection::EVENT_BEGIN_TRANSACTION);
-            if ($isolationLevel !== null) {
-                $this->db->pdo->beginTransaction(false);
-                $this->db->getSchema()->setTransactionIsolationLevel($isolationLevel);
-            } else {
-                $this->db->pdo->beginTransaction();
-            }
+            $this->db->pdo->beginTransaction($isolationLevel);
             $this->_level = 1;
 
             return;
@@ -182,11 +177,9 @@ class Transaction extends \yii\db\Transaction
      */
     public function setIsolationLevel($level)
     {
-        if (!$this->getIsActive()) {
-            throw new Exception('Failed to set isolation level: transaction was inactive.');
-        }
-        Yii::trace('Setting transaction isolation level to ' . $level, __METHOD__);
-        $this->db->getSchema()->setTransactionIsolationLevel($level);
+        throw new \BadMethodCallException(
+            'Firebird transaction isolation level must be specified before starting a transaction.'
+        );
     }
 
     /**
